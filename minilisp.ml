@@ -68,6 +68,39 @@ let rec parse_exp = function
   | Var x -> Var x
   | _ -> failwith "parse_exp#1 error"
 
+let rec eval env = function
+  | Var x -> eval env (Hashtbl.find env x)
+  | Apply (name, params) -> begin
+      try
+        let func = Hashtbl.find env name in
+        match func with
+        | Func (_, args, expr) -> begin
+          let newenv = Hashtbl.copy env in
+          ignore (
+            List.fold_left
+            (fun i arg ->
+              Hashtbl.replace newenv arg (List.nth params i); i + 1) 0 args
+          );
+          eval newenv expr
+        end
+        | _ -> failwith "Func() isn't found"
+      with Not_found -> begin
+        match name with
+        | "+" -> 
+          let n0 = eval env (List.nth params 0) in
+          let n1 = eval env (List.nth params 1) in
+          begin
+            match (n0, n1) with 
+            | (Num(x0), Num(x1)) -> Num(x0 + x1)
+            | _ -> failwith "'+' accepts only numbers"
+          end
+        | _ -> failwith (name ^ " isn't defined")
+      end
+    end
+  | Num x -> Num x
+  | _ -> failwith "hogehogehoge"
+
+
 let test expected expr =
   print_endline ("expr: " ^ expr);
   let expr = parse_token (lexer (Stream.of_string expr)) in
@@ -88,6 +121,8 @@ let () =
           Cond(Apply("<=", [Var("n");Num(0)]), Var("y"),
           Apply("fib", [Apply("-", [Var("n");Num(1)]); Var("y"); Apply("+", [Var("x");Var("y")])]))))
     "(define (fib n x y) (if (<= n 0) y (fib (- n 1) y (+ x y))))";
+  let expr = eval (Hashtbl.create 32) (Apply("+", [Num(2);Num(3)])) in
+  print_endline (string_of_expr expr);
   let expr = parse_token (lexer (Stream.of_string Sys.argv.(1))) in
   let expr = parse_exp expr in
   print_endline (string_of_expr expr)
