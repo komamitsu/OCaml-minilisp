@@ -1,3 +1,4 @@
+open Genlex
 open Printf
 
 module Expr = struct
@@ -40,7 +41,6 @@ let parse_many f x =
   in
   loop x []
 
-open Genlex
 open Expr
 
 let rec parse_token = parser
@@ -80,46 +80,74 @@ module Env = struct
   let put t k v = Hashtbl.replace t k v
 end
 
-let rec eval env = function
-  | Var x -> eval env (Env.get env x)
-  | Func (name, _, _) as x -> 
-      Env.put env name x; x
-  | Apply (name, params) -> begin
-      try
-        let func = Env.get env name in
-        let newenv = Env.clone env in
-        match func with
-        | Func (_, args, expr) -> begin
-          ignore (
-            List.fold_left
-            (fun i arg ->
-              Env.put newenv arg (List.nth params i); i + 1) 0 args
-          );
-          eval newenv expr
-        end
-        | _ -> failwith "Func() isn't found"
-      with Not_found -> begin
-        match name with
-        | "+" -> 
-            Num (
+module Eval = struct
+  let rec apply_arithm env f label params =
+    Num (
+    List.fold_left
+      (fun a expr -> 
+        match eval env expr with
+        | Num x -> f a x
+        | _ -> failwith ("'" ^ label ^ "' accepts only numbers")
+      ) 0 params
+    )
+  and apply_cond env f label params =
+    let (result, _) =
+      List.fold_left
+        (fun (b, last) expr -> 
+          match eval env expr with
+          | Num x -> begin
+            match last with
+            | None -> (true, Some expr)
+            | Some (last_expr) -> begin
+              match eval env last_expr with
+              | Num y -> (b && f y x, Some expr)
+              | _ -> failwith ("'" ^ label ^ "' accepts only numbers#0")
+            end
+          end
+          | _ -> failwith ("'" ^ label ^ "' accepts only numbers#1")
+        ) (true, None) params
+    in
+    if result then True else False
+  and eval env = function
+    | Var x -> eval env (Env.get env x)
+    | Func (name, _, _) as x -> 
+        Env.put env name x; x
+    | Apply (name, params) -> begin
+        try
+          let func = Env.get env name in
+          let newenv = Env.clone env in
+          match func with
+          | Func (_, args, expr) -> begin
+            ignore (
               List.fold_left
-              (fun a expr -> 
-                match eval env expr with
-                | Num x -> a + x
-                | _ -> failwith "'+' accepts only numbers"
-              ) 0 params
-            )
-        | _ -> failwith (name ^ " isn't defined")
+              (fun i arg ->
+                Env.put newenv arg (List.nth params i); i + 1) 0 args
+            );
+            eval newenv expr
+          end
+          | _ -> failwith "Func() isn't found"
+        with Not_found -> begin
+          match name with
+          | "+" -> apply_arithm env (+) "+" params
+          | "-" -> apply_arithm env (-) "-" params
+          | "*" -> apply_arithm env ( * ) "*" params
+          | "/" -> apply_arithm env (/) "/" params
+          | "=" -> apply_cond env (=) "=" params
+          | ">" -> apply_cond env (>) ">" params
+          | "<" -> apply_cond env (<) "<" params
+          | ">=" -> apply_cond env (>=) ">=" params
+          | "<=" -> apply_cond env (>=) "<=" params
+          | _ -> failwith (name ^ " isn't defined")
+        end
       end
+    | Cond (cond, ethen, eelse) -> begin
+        match cond with
+        | True -> eval env ethen
+        | False -> eval env eelse
+        | _ -> failwith "condition should be boolean"
     end
-  | Cond (cond, ethen, eelse) -> begin
-      match cond with
-      | True -> eval env ethen
-      | False -> eval env eelse
-      | _ -> failwith "conditoin should be boolean"
-  end
-  | x -> x
-
+    | x -> x
+end
 
 let test expected expr =
   print_endline ("expr: " ^ expr);
@@ -141,9 +169,9 @@ let () =
           Cond(Apply("<=", [Var("n");Num(0)]), Var("y"),
           Apply("fib", [Apply("-", [Var("n");Num(1)]); Var("y"); Apply("+", [Var("x");Var("y")])]))))
     "(define (fib n x y) (if (<= n 0) y (fib (- n 1) y (+ x y))))";
-  let expr = eval (Hashtbl.create 32) (Apply("+", [Num(2);Num(3)])) in
+  let expr = Eval.eval (Env.init ()) (Apply("+", [Num(2);Num(3)])) in
   print_endline (string_of_expr expr);
   let expr = parse_token (lexer (Stream.of_string Sys.argv.(1))) in
   let expr = parse_exp expr in
-  print_endline (string_of_expr expr)
+  print_endline (string_of_expr (Eval.eval (Env.init ()) expr))
 
