@@ -4,8 +4,8 @@ module Expr = struct
   type expr =
     | Num of int
     | Var of string
-    | T
-    | Nil
+    | True
+    | False
     | Func of string * string list * expr
     | Apply of string * expr list
     | List of expr list
@@ -14,8 +14,8 @@ module Expr = struct
   let rec string_of_expr = function
     | Num n -> "Num(" ^ string_of_int n ^ ")"
     | Var s -> "Var(" ^ s ^ ")"
-    | T -> "T" 
-    | Nil -> "Nil" 
+    | True -> "True" 
+    | False -> "False" 
     | Func (name, args, expr) -> 
         let args_str = List.fold_left (fun a x -> a ^ string_of_comma a ^ x) "" args in
         "Func(" ^ name ^ ", [" ^ args_str ^ "], " ^ (string_of_expr expr) ^ ")"
@@ -68,18 +68,32 @@ let rec parse_exp = function
   | Var x -> Var x
   | _ -> failwith "parse_exp#1 error"
 
+module Env = struct
+  type t = (string, expr) Hashtbl.t
+
+  let init () = Hashtbl.create 30
+
+  let clone t = Hashtbl.copy t
+
+  let get t k = Hashtbl.find t k
+
+  let put t k v = Hashtbl.replace t k v
+end
+
 let rec eval env = function
-  | Var x -> eval env (Hashtbl.find env x)
+  | Var x -> eval env (Env.get env x)
+  | Func (name, _, _) as x -> 
+      Env.put env name x; x
   | Apply (name, params) -> begin
       try
-        let func = Hashtbl.find env name in
+        let func = Env.get env name in
+        let newenv = Env.clone env in
         match func with
         | Func (_, args, expr) -> begin
-          let newenv = Hashtbl.copy env in
           ignore (
             List.fold_left
             (fun i arg ->
-              Hashtbl.replace newenv arg (List.nth params i); i + 1) 0 args
+              Env.put newenv arg (List.nth params i); i + 1) 0 args
           );
           eval newenv expr
         end
@@ -87,18 +101,24 @@ let rec eval env = function
       with Not_found -> begin
         match name with
         | "+" -> 
-          let n0 = eval env (List.nth params 0) in
-          let n1 = eval env (List.nth params 1) in
-          begin
-            match (n0, n1) with 
-            | (Num(x0), Num(x1)) -> Num(x0 + x1)
-            | _ -> failwith "'+' accepts only numbers"
-          end
+            Num (
+              List.fold_left
+              (fun a expr -> 
+                match eval env expr with
+                | Num x -> a + x
+                | _ -> failwith "'+' accepts only numbers"
+              ) 0 params
+            )
         | _ -> failwith (name ^ " isn't defined")
       end
     end
-  | Num x -> Num x
-  | _ -> failwith "hogehogehoge"
+  | Cond (cond, ethen, eelse) -> begin
+      match cond with
+      | True -> eval env ethen
+      | False -> eval env eelse
+      | _ -> failwith "conditoin should be boolean"
+  end
+  | x -> x
 
 
 let test expected expr =
