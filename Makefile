@@ -1,3 +1,3 @@
 minilisp: minilisp.ml
-	ocamlfind c -pp 'camlp4o' $< -o $@
+	ocamlfind c -g -pp 'camlp4o' $< -o $@
 
