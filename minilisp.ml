@@ -50,6 +50,9 @@ module Parser = struct
     | [<'Ident x>] -> Var x
     | [< _ >] -> failwith "parse_token error"
 
+  let rec parse_token_list = parser
+    | [<es = parse_many parse_token>] -> es
+
   let rec parse_exp = function
     | List(exprs) -> begin
       match exprs with
@@ -70,8 +73,10 @@ module Parser = struct
     | _ -> failwith "parse_exp#1 error"
 
   let parse s =
-    let preparsed = parse_token (lexer (Stream.of_string s)) in
-    parse_exp preparsed
+    let preparsed_list = parse_token_list (lexer (Stream.of_string s)) in
+    List.rev (
+      List.fold_left (fun a x -> parse_exp x::a) [] preparsed_list
+    )
 end
 
 module Env = struct
@@ -87,7 +92,7 @@ module Env = struct
 end
 
 module Eval = struct
-  let rec apply_arithm env (f:(int -> int -> int)) label params =
+  let rec apply_arithm env f label params =
     let rec loop result = function 
       | [] -> begin
           match result with
@@ -95,6 +100,7 @@ module Eval = struct
           | Some _ -> failwith ("'" ^ label ^ "' accepts only numbers")
           | None -> failwith ("'" ^ label ^ "' needs arguments")
       end
+      (* TODO: eval hd *)
       | (Num hd)::tl -> begin
           match result with
           | Some (Num a) -> loop (Some (Num (f a hd))) tl
@@ -103,29 +109,30 @@ module Eval = struct
       end
       | _ -> failwith ("'" ^ label ^ "' accepts only numbers")
     in
-    loop None params
+    (env, loop None params)
   and apply_cond env f label params =
     let (result, _) =
       List.fold_left
         (fun (b, last) expr -> 
           match eval env expr with
-          | Num x -> begin
+          | (newenv, Num x) -> begin
             match last with
             | None -> (true, Some expr)
             | Some (last_expr) -> begin
-              match eval env last_expr with
-              | Num y -> (b && f y x, Some expr)
+              match eval newenv last_expr with
+              | (newenv, Num y) -> (b && f y x, Some expr)
               | _ -> failwith ("'" ^ label ^ "' accepts only numbers#0")
             end
           end
           | _ -> failwith ("'" ^ label ^ "' accepts only numbers#1")
         ) (true, None) params
     in
-    if result then True else False
-  and eval env = function
+    (env, if result then True else False)
+  and eval (env:Env.t) expr : (Env.t * expr) = match expr with
     | Var x -> eval env (Env.get env x)
-    | Func (name, _, _) as x -> 
-        Env.put env name x; x
+    | Func (name, _, _) as x -> begin
+        Env.put env name x; (env, x)
+    end
     | Apply (name, params) -> begin
         try
           let func = Env.get env name in
@@ -160,41 +167,54 @@ module Eval = struct
         | False -> eval env eelse
         | _ -> failwith "condition should be boolean"
     end
-    | x -> x
+    | x -> (env, x)
 end
 
 module Test = struct
   let test_expr expected s =
-    let expr = Parser.parse s in
-    assert (expected = expr)
+    let exprs = Parser.parse s in
+    assert (expected = exprs)
 
   let test_eval expected s =
-    let expr = Parser.parse s in
-    let evaled = Eval.eval (Env.init ()) expr in
-    assert (expected = evaled)
+    let exprs = Parser.parse s in
+    let evaled_list =
+      List.fold_left (fun a x ->
+        let (newenv, evaled) = Eval.eval (Env.init ()) x in
+        evaled::a
+      ) [] exprs
+    in
+    assert (expected = evaled_list)
+    
 
   let test () =
-    test_expr (Func("fib", ["n"; "x"; "y"], Num(2))) "(define (fib n x y) 2)";
-    test_expr (Func("sub", ["x"; "y"], Apply("-", [Var("x");Var("y")]))) "(define (sub x y) (- x y))";
-    test_expr (Apply("fib", [Num(1); Var("x")])) "(fib 1 x)";
-    test_expr (Cond(Apply(">",[Num(1);Num(0)]), Var("x"), Apply("+", [Num(1);Num(2)]))) "(if (> 1 0) x (+ 1 2))";
-    test_expr (Apply("+", [Var("x");Var("y")])) "(+ x y)";
-    test_expr (Apply("fib", [Apply("-", [Var("n");Num(1)]); Var("y"); 
-          Apply("+", [Var("x");Var("y")])])) "(fib (- n 1) y (+ x y))";
-    test_expr (Func("fib", ["n";"x";"y"], 
-            Cond(Apply("<=", [Var("n");Num(0)]), Var("y"),
-            Apply("fib", [Apply("-", [Var("n");Num(1)]); Var("y"); Apply("+", [Var("x");Var("y")])]))))
-      "(define (fib n x y) (if (<= n 0) y (fib (- n 1) y (+ x y))))";
-    test_eval True "(= 1 1)";
-    test_eval False "(= 1 2)";
-    test_eval True "(= (+ 1 1) 2)"
+    test_expr [Func("fib", ["n"; "x"; "y"], Num(2))] "(define (fib n x y) 2)";
+    test_expr [Func("sub", ["x"; "y"], Apply("-", [Var("x");Var("y")]))] "(define (sub x y) (- x y))";
+    test_expr [Apply("fib", [Num(1); Var("x")])] "(fib 1 x)";
+    test_expr [Cond(Apply(">",[Num(1);Num(0)]), Var("x"), Apply("+", [Num(1);Num(2)]))]
+          "(if (> 1 0) x (+ 1 2))";
+    test_expr [Apply("+", [Var("x");Var("y")])] "(+ x y)";
+    test_expr [Apply("fib", [Apply("-", [Var("n");Num(1)]); Var("y"); Apply("+", [Var("x");Var("y")])])]
+          "(fib (- n 1) y (+ x y))";
+    test_expr [Func("fib", ["n";"x";"y"],
+          Cond(Apply("<=", [Var("n");Num(0)]),
+          Var("y"),
+          Apply("fib", [Apply("-", [Var("n");Num(1)]); Var("y"); Apply("+", [Var("x");Var("y")])])
+          ))] "(define (fib n x y) (if (<= n 0) y (fib (- n 1) y (+ x y))))";
+    test_expr [Apply("+", [Num(1); Num(2)]); Apply("-", [Num(5); Num(3)])] "(+ 1 2) (- 5 3)";
+    test_eval [True] "(= 1 1)";
+    test_eval [False] "(= 1 2)";
+    test_eval [True] "(= (+ 1 1) 2)";
+    test_eval [Num(2)] "(- 5 3)";
+    test_eval [True] "(= 2 (- 5 3))";
+    test_eval [True] "(= (+ 1 1) (- 5 3))"
 end
 
 let () =
   Test.test ();
-  Test.test_eval (Num(2)) "(- 5 3)";
-  Test.test_eval True "(= 2 (- 5 3))";
-  Test.test_eval True "(= (+ 1 1) (- 5 3))";
-  let expr = Parser.parse Sys.argv.(1) in
-  print_endline (string_of_expr (Eval.eval (Env.init ()) expr))
+  let exprs = Parser.parse Sys.argv.(1) in
+  (* TODO: use newenv *)
+  List.iter (fun x ->
+    let (newenv, evaled) = Eval.eval (Env.init ()) x in
+    print_endline (string_of_expr evaled)
+  ) exprs
 
