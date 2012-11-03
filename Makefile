@@ -2,7 +2,7 @@ TARGET=minilisp
 TEST=test
 SRCS=expr.ml parser.mli parser.ml env.ml eval.mli eval.ml 
 
-${TARGET}: ${SRCS} minilisp.ml
+${TARGET}: ${SRCS} main.ml
 	ocamlfind c -g -pp 'camlp4o' $? -o $@
 
 ${TEST}: ${SRCS} test.ml
