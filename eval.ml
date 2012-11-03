@@ -48,6 +48,12 @@ and apply_cond env f label params =
   in
   (env, if result then True else False)
 
+and apply_print env params =
+  let (env, params) = update_apply_params env params in
+  List.iter (fun expr -> print_endline (string_of_expr expr)) params;
+  let last_param = List.nth params ((List.length params) - 1) in
+  (env, last_param)
+
 and update_apply_params env orig_params =
   let rec _update_apply_params env params orig_params =
     match orig_params with
@@ -97,6 +103,7 @@ and eval_expr env expr =
         | "<" -> apply_cond env (<) "<" params
         | ">=" -> apply_cond env (>=) ">=" params
         | "<=" -> apply_cond env (<=) "<=" params
+        | "print" -> apply_print env params
         | _ -> failwith (name ^ " isn't defined")
       end
     end
