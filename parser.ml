@@ -22,28 +22,28 @@ let rec parse_token = parser
 let rec parse_token_list = parser
   | [<es = parse_many parse_token>] -> es
 
-let rec parse_exp = function
+let rec parse_expr = function
   | List(exprs) -> begin
     match exprs with
-    | Var("define")::List(Var(name)::vars)::expr::[] -> 
+    | Var("define") :: List(Var(name)::vars) :: expr :: [] -> 
         let params =
           List.map 
           (function Var x -> x | _ -> failwith "argument should be var") vars in
-        Func(name, params, parse_exp expr)
-    | Var("if")::expr_cond::expr_then::expr_else::[] ->
-        Cond(parse_exp expr_cond, parse_exp expr_then, parse_exp expr_else)
-    | Var(name)::exprs -> 
-        let args = List.map parse_exp exprs in
+        Func(name, params, parse_expr expr)
+    | Var("if") :: expr_cond :: expr_then :: expr_else :: [] ->
+        Cond(parse_expr expr_cond, parse_expr expr_then, parse_expr expr_else)
+    | Var(name) :: exprs -> 
+        let args = List.map parse_expr exprs in
         Apply(name, args)
-    | _ -> failwith "parse_exp#0 error"
+    | _ -> failwith "parse_expr#0 error"
   end
     | Num x -> Num x
     | Var x -> Var x
-    | _ -> failwith "parse_exp#1 error"
+    | _ -> failwith "parse_expr#1 error"
 
 let parse s =
   let preparsed_list = parse_token_list (lexer (Stream.of_string s)) in
   List.rev (
-    List.fold_left (fun a x -> parse_exp x::a) [] preparsed_list
+    List.fold_left (fun a x -> parse_expr x::a) [] preparsed_list
   )
 

@@ -1,7 +1,7 @@
 open Expr
 
 let debug_print env expr =
-  Printf.printf "eval -----------------------------\n";
+  Printf.printf "eval_expr -----------------------------\n";
   Printf.printf "  env ----------------------------\n";
   Hashtbl.iter
     (fun k v ->
@@ -18,7 +18,7 @@ let rec apply_arithm env f label params =
         | None -> failwith ("'" ^ label ^ "' needs arguments")
     end
     | hd::tl -> begin
-      let (newenv, expr) = eval env hd in
+      let (newenv, expr) = eval_expr env hd in
       match expr with
       | Num x -> begin
         match result with
@@ -35,12 +35,12 @@ and apply_cond env f label params =
   let (result, _) =
     List.fold_left
       (fun (b, last) expr -> 
-        match eval env expr with
+        match eval_expr env expr with
         | (newenv, Num x) -> begin
           match last with
           | None -> (true, Some expr)
           | Some (last_expr) -> begin
-            match eval newenv last_expr with
+            match eval_expr newenv last_expr with
             | (newenv, Num y) -> (b && f y x, Some expr)
             | _ -> failwith ("'" ^ label ^ "' accepts only numbers#0")
           end
@@ -54,15 +54,15 @@ and update_apply_params env param_exprs orig_params =
   match orig_params with
   | [] -> (env, List.rev param_exprs)
   | orig_param::rest ->
-      let (newenv, new_param) = eval env orig_param in
+      let (newenv, new_param) = eval_expr env orig_param in
       update_apply_params newenv (new_param::param_exprs) rest
 
-and eval env expr =
+and eval_expr env expr =
   (*
   debug_print env expr;
   *)
   match expr with
-  | Var x -> eval env (Env.get env x)
+  | Var x -> eval_expr env (Env.get env x)
 
   | Func (name, _, _) as x -> begin
       Env.put env name x; (env, x)
@@ -80,7 +80,7 @@ and eval env expr =
             (fun i arg ->
               Env.put newenv arg (List.nth params i); i + 1) 0 args
           );
-          eval newenv expr
+          eval_expr newenv expr
         end
         | _ -> failwith "Func() isn't found"
       with Not_found -> begin
@@ -99,20 +99,20 @@ and eval env expr =
     end
 
   | Cond (cond, ethen, eelse) -> begin
-    let (newenv, evaled_expr) = eval env cond in
+    let (newenv, evaled_expr) = eval_expr env cond in
       match evaled_expr with
-      | True -> eval newenv ethen
-      | False -> eval newenv eelse
+      | True -> eval_expr newenv ethen
+      | False -> eval_expr newenv eelse
       | _ -> failwith "condition should be boolean"
   end
 
   | x -> (env, x)
 
-let eval_exprs exprs =
+let eval exprs =
   let rec loop env last_evaled_expr = function
     | [] -> last_evaled_expr
     | expr::rest ->
-      let (newenv, evaled) = eval env expr in
+      let (newenv, evaled) = eval_expr env expr in
       loop newenv (Some evaled) rest
   in
   loop (Env.init ()) None exprs
