@@ -92,6 +92,15 @@ module Env = struct
 end
 
 module Eval = struct
+  let debug_print env expr =
+    Printf.printf "eval -----------------------------\n";
+    Printf.printf "  env ----------------------------\n";
+    Hashtbl.iter
+      (fun k v ->
+    Printf.printf "    [%s] => %s \n" k (Expr.string_of_expr v)) env;
+    Printf.printf "  expr ---------------------------\n";
+    Printf.printf "    %s \n" (Expr.string_of_expr expr)
+
   let rec apply_arithm env f label params =
     let rec loop result = function 
       | [] -> begin
@@ -113,6 +122,7 @@ module Eval = struct
       end
     in
     (env, loop None params)
+
   and apply_cond env f label params =
     let (result, _) =
       List.fold_left
@@ -131,12 +141,27 @@ module Eval = struct
         ) (true, None) params
     in
     (env, if result then True else False)
-  and eval (env:Env.t) expr : (Env.t * expr) = match expr with
+
+  and update_apply_params env param_exprs orig_params =
+    match orig_params with
+    | [] -> (env, List.rev param_exprs)
+    | orig_param::rest ->
+        let (newenv, new_param) = eval env orig_param in
+        update_apply_params newenv (new_param::param_exprs) rest
+
+  and eval env expr =
+    (*
+    debug_print env expr;
+    *)
+    match expr with
     | Var x -> eval env (Env.get env x)
+
     | Func (name, _, _) as x -> begin
         Env.put env name x; (env, x)
     end
+
     | Apply (name, params) -> begin
+        let (newenv, params) = update_apply_params env [] params in
         try
           let func = Env.get env name in
           let newenv = Env.clone env in
@@ -160,17 +185,29 @@ module Eval = struct
           | ">" -> apply_cond env (>) ">" params
           | "<" -> apply_cond env (<) "<" params
           | ">=" -> apply_cond env (>=) ">=" params
-          | "<=" -> apply_cond env (>=) "<=" params
+          | "<=" -> apply_cond env (<=) "<=" params
           | _ -> failwith (name ^ " isn't defined")
         end
       end
+
     | Cond (cond, ethen, eelse) -> begin
-        match cond with
-        | True -> eval env ethen
-        | False -> eval env eelse
+      let (newenv, evaled_expr) = eval env cond in
+        match evaled_expr with
+        | True -> eval newenv ethen
+        | False -> eval newenv eelse
         | _ -> failwith "condition should be boolean"
     end
+
     | x -> (env, x)
+
+  let eval_exprs exprs =
+    let rec loop env last_evaled_expr = function
+      | [] -> last_evaled_expr
+      | expr::rest ->
+        let (newenv, evaled) = eval env expr in
+        loop newenv (Some evaled) rest
+    in
+    loop (Env.init ()) None exprs
 end
 
 module Test = struct
@@ -180,15 +217,9 @@ module Test = struct
 
   let test_eval expected s =
     let exprs = Parser.parse s in
-    let evaled_list =
-      List.fold_left (fun a x ->
-        let (newenv, evaled) = Eval.eval (Env.init ()) x in
-        evaled::a
-      ) [] exprs
-    in
-    assert (expected = evaled_list)
+    let evaled_expr = Eval.eval_exprs exprs in
+    assert (expected = evaled_expr)
     
-
   let test () =
     test_expr [Func("fib", ["n"; "x"; "y"], Num(2))] "(define (fib n x y) 2)";
     test_expr [Func("sub", ["x"; "y"], Apply("-", [Var("x");Var("y")]))] "(define (sub x y) (- x y))";
@@ -204,21 +235,31 @@ module Test = struct
           Apply("fib", [Apply("-", [Var("n");Num(1)]); Var("y"); Apply("+", [Var("x");Var("y")])])
           ))] "(define (fib n x y) (if (<= n 0) y (fib (- n 1) y (+ x y))))";
     test_expr [Apply("+", [Num(1); Num(2)]); Apply("-", [Num(5); Num(3)])] "(+ 1 2) (- 5 3)";
-    test_eval [True] "(= 1 1)";
-    test_eval [False] "(= 1 2)";
-    test_eval [True] "(= (+ 1 1) 2)";
-    test_eval [Num(2)] "(- 5 3)";
-    test_eval [True] "(= 2 (- 5 3))";
-    test_eval [True] "(= (+ 1 1) (- 5 3))";
-    test_eval [Num(12)] "( * (+ 1 2) (- 10 6))"
+    test_eval None "";
+    test_eval (Some(True)) "(= 1 1)";
+    test_eval (Some(False)) "(= 1 2)";
+    test_eval (Some(True)) "(= (+ 1 1) 2)";
+    test_eval (Some(Num(2))) "(- 5 3)";
+    test_eval (Some(True)) "(= 2 (- 5 3))";
+    test_eval (Some(True)) "(= (+ 1 1) (- 5 3))";
+    test_eval (Some(Num(12))) "( * (+ 1 2) (- 10 6))";
+    test_eval (Some(Num(130))) "(define (hoge a b) (+ a b 100)) (hoge 10 20)";
+    test_eval (Some(Num(5))) "(if (> 2 1) 5 10)";
+    test_eval (Some(Num(1)))
+      "(define (hoge x) (if (> x 10) 1 2)) (hoge 11)";
+    test_eval (Some(Num(123)))
+      "(define (loop n) (if (<= 0 n) 123 (loop (- n 1)))) (loop 3)";
+    test_eval (Some(Num(6)))
+      "(define (fact a n) (if (<= n 0) a (fact ( * a n) (- n 1)))) (fact 1 3)";
+    test_eval (Some(Num(13)))
+      "(define (fib n x y) (if (<= n 0) y (fib (- n 1) y (+ x y)))) (fib 5 1 1)"
 end
 
 let () =
   Test.test ();
   let exprs = Parser.parse Sys.argv.(1) in
-  (* TODO: use newenv *)
-  List.iter (fun x ->
-    let (newenv, evaled) = Eval.eval (Env.init ()) x in
-    print_endline (string_of_expr evaled)
-  ) exprs
+  let evaled_expr = Eval.eval_exprs exprs in
+  match evaled_expr with 
+  | Some e -> print_endline (Expr.string_of_expr e)
+  | None -> ()
 
