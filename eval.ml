@@ -118,12 +118,12 @@ and eval_expr env expr =
 
   | x -> (env, x)
 
-let eval exprs =
+let eval exprs ?(env = Env.init ()) () =
   let rec loop env last_evaled_expr = function
-    | [] -> last_evaled_expr
+    | [] -> (env, last_evaled_expr)
     | expr::rest ->
       let (env, evaled) = eval_expr env expr in
       loop env (Some evaled) rest
   in
-  loop (Env.init ()) None exprs
+  loop env None exprs
 

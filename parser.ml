@@ -41,9 +41,12 @@ let rec parse_expr = function
     | Var x -> Var x
     | _ -> failwith "parse_expr#1 error"
 
-let parse s =
-  let preparsed_list = parse_token_list (lexer (Stream.of_string s)) in
+let parse stream = 
+  let preparsed_list = parse_token_list (lexer stream) in
   List.rev (
     List.fold_left (fun a x -> parse_expr x::a) [] preparsed_list
   )
 
+let parse_string s = parse (Stream.of_string s)
+
+let parse_channel ch = parse (Stream.of_channel ch)

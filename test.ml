@@ -1,12 +1,12 @@
 open Expr
 
 let test_expr expected s =
-  let exprs = Parser.parse s in
+  let exprs = Parser.parse_string s in
   assert (expected = exprs)
 
 let test_eval expected s =
-  let exprs = Parser.parse s in
-  let evaled_expr = Eval.eval exprs in
+  let exprs = Parser.parse_string s in
+  let (env, evaled_expr) = Eval.eval exprs () in
   assert (expected = evaled_expr)
   
 let test () =
