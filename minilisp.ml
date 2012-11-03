@@ -100,14 +100,17 @@ module Eval = struct
           | Some _ -> failwith ("'" ^ label ^ "' accepts only numbers")
           | None -> failwith ("'" ^ label ^ "' needs arguments")
       end
-      (* TODO: eval hd *)
-      | (Num hd)::tl -> begin
+      | hd::tl -> begin
+        let (newenv, expr) = eval env hd in
+        match expr with
+        | Num x -> begin
           match result with
-          | Some (Num a) -> loop (Some (Num (f a hd))) tl
+          | Some (Num a) -> loop (Some (Num (f a x))) tl
           | Some _ -> failwith ("'" ^ label ^ "' accepts only numbers")
-          | None -> loop (Some (Num hd)) tl
+          | None -> loop (Some (Num x)) tl
+        end
+        | _ -> failwith ("'" ^ label ^ "' accepts only numbers")
       end
-      | _ -> failwith ("'" ^ label ^ "' accepts only numbers")
     in
     (env, loop None params)
   and apply_cond env f label params =
@@ -206,7 +209,8 @@ module Test = struct
     test_eval [True] "(= (+ 1 1) 2)";
     test_eval [Num(2)] "(- 5 3)";
     test_eval [True] "(= 2 (- 5 3))";
-    test_eval [True] "(= (+ 1 1) (- 5 3))"
+    test_eval [True] "(= (+ 1 1) (- 5 3))";
+    test_eval [Num(12)] "( * (+ 1 2) (- 10 6))"
 end
 
 let () =
