@@ -1,0 +1,23 @@
+.PHONY: all clean
+
+FILES[] =
+	expr
+	parser
+	env
+	eval
+	main
+
+PROGRAM = ../minilisp
+LIB = target
+OCAML_LIBS += 
+OCAML_CLIBS +=
+OCAML_OTHER_LIBS +=
+OCAML_LIB_FLAGS +=
+
+.DEFAULT: $(OCamlProgram $(PROGRAM), $(FILES))
+
+OCamlLibrary($(LIB), $(FILES))
+
+clean:
+	rm -f *~ $(PROGRAM) $(PROGRAM).opt $(PROGRAM).run *.opt *.cmi *.cma *.cmx *.cmo *.cmxa *.a *.o *.omc
+

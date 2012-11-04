@@ -8,12 +8,12 @@ Installation
 ----
 1. Clone the repo
 2. `cd ocaml-minilisp`
-3. `make`
+3. `omake`
 
 
 Test
 ----
-1. `make test`
+1. `omake test`
 
 
 Repl

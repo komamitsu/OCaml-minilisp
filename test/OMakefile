@@ -1,0 +1,23 @@
+.PHONY: all test clean
+
+OCAMLINCLUDES += ../src/
+
+FILES[] =
+	test
+
+PROGRAM = test
+OCAML_LIBS += ../src/target
+OCAML_CLIBS +=
+OCAML_OTHER_LIBS +=
+OCAML_LIB_FLAGS +=
+
+.DEFAULT: all
+
+all : $(OCamlProgram $(PROGRAM), $(FILES))
+
+test: all
+	./$(PROGRAM)
+
+clean:
+	rm -f *~ $(PROGRAM) *.run *.opt *.cmi *.cmx *.cmo *.o *.omc
+
