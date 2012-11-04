@@ -4,9 +4,9 @@ open Expr
 let debug_print env expr =
   printf "eval_expr --------------------------\n";
   printf "  env ----------------------------\n";
-  Hashtbl.iter
+  Env.iter env
     (fun k v ->
-  printf "    [%s] => %s \n" k (string_of_expr v)) env;
+  printf "    [%s] => %s \n" k (string_of_expr v));
   printf "  expr ---------------------------\n";
   printf "    %s \n" (string_of_expr expr)
 

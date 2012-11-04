@@ -8,3 +8,4 @@ let get t k = Hashtbl.find t k
 
 let put t k v = Hashtbl.replace t k v
 
+let iter t f = Hashtbl.iter f t
