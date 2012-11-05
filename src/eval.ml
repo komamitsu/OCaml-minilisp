@@ -17,16 +17,16 @@ let rec apply_arithm env f label params =
     | [] -> begin
         match result with
         | Some (Num a) -> Num a
-        | Some _ -> failwith ("'" ^ label ^ "' accepts only numbers")
-        | None -> failwith ("'" ^ label ^ "' needs arguments")
+        | Some _ -> "'" ^ label ^ "' accepts only numbers" |> failwith 
+        | None -> "'" ^ label ^ "' needs arguments" |> failwith 
     end
     | Num(x)::rest -> begin
       match result with
       | Some (Num a) -> loop (Some (Num (f a x))) rest
-      | Some _ -> failwith ("'" ^ label ^ "' accepts only numbers")
+      | Some _ -> "'" ^ label ^ "' accepts only numbers" |> failwith 
       | None -> loop (Some (Num x)) rest
     end
-    | _ -> failwith ("'" ^ label ^ "' accepts only numbers")
+    | _ -> "'" ^ label ^ "' accepts only numbers" |> failwith
   in
   (env, loop None params)
 
@@ -41,10 +41,10 @@ and apply_cond env f label params =
           | Some last_expr -> begin
             match last_expr with
             | Num y -> (result && f y x, Some expr)
-            | _ -> failwith ("'" ^ label ^ "' accepts only numbers#0")
+            | _ -> "'" ^ label ^ "' accepts only numbers#0" |> failwith 
           end
         end
-        | _ -> failwith ("'" ^ label ^ "' accepts only numbers#1")
+        | _ -> "'" ^ label ^ "' accepts only numbers#1" |> failwith
       ) (true, None) params
   in
   (env, if result then True else False)
@@ -52,7 +52,7 @@ and apply_cond env f label params =
 and apply_print env params =
   let (env, params) = update_apply_params env params in
   List.iter (fun expr -> print_endline **> string_of_expr expr) params;
-  let last_param = List.nth params ((List.length params) - 1) in
+  let last_param = List.length params - 1 |> List.nth params in
   (env, last_param)
 
 and update_apply_params env orig_params =
@@ -105,7 +105,7 @@ and eval_expr env expr =
         | ">=" -> apply_cond env (>=) ">=" params
         | "<=" -> apply_cond env (<=) "<=" params
         | "print" -> apply_print env params
-        | _ -> failwith (name ^ " isn't defined")
+        | _ -> name ^ " isn't defined" |> failwith
       end
     end
 
