@@ -1,3 +1,4 @@
+open BatPervasives
 open Genlex
 open Printf
 open Expr
@@ -42,11 +43,9 @@ let rec parse_expr = function
     | _ -> failwith "parse_expr#1 error"
 
 let parse stream = 
-  let preparsed_list = parse_token_list (lexer stream) in
-  List.rev (
-    List.fold_left (fun a x -> parse_expr x::a) [] preparsed_list
-  )
+  let preparsed_list = parse_token_list **> lexer stream in
+  List.rev **> List.fold_left (fun a x -> parse_expr x::a) [] preparsed_list
 
-let parse_string s = parse (Stream.of_string s)
+let parse_string s = parse **> Stream.of_string s
 
-let parse_channel ch = parse (Stream.of_channel ch)
+let parse_channel ch = parse **> Stream.of_channel ch

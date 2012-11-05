@@ -1,8 +1,10 @@
+open BatPervasives
+
 let () =
   if Array.length Sys.argv > 1 then
     (* from file *)
     let filename = Sys.argv.(1) in
-    let in_ch = open_in filename in
+    let in_ch = Pervasives.open_in filename in
     let exprs = Parser.parse_channel in_ch in
     ignore (Eval.eval exprs ())
   else
@@ -24,7 +26,7 @@ let () =
           begin
             match last_expr with
             | None -> ()
-            | Some expr -> print_endline (Expr.string_of_expr expr)
+            | Some expr -> print_endline **> Expr.string_of_expr expr
           end;
           env
         end

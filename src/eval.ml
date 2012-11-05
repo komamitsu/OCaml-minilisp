@@ -1,3 +1,4 @@
+open BatPervasives
 open Printf
 open Expr
 
@@ -6,9 +7,9 @@ let debug_print env expr =
   printf "  env ----------------------------\n";
   Env.iter env
     (fun k v ->
-  printf "    [%s] => %s \n" k (string_of_expr v));
+  printf "    [%s] => %s \n" k **> string_of_expr v);
   printf "  expr ---------------------------\n";
-  printf "    %s \n" (string_of_expr expr)
+  printf "    %s \n" **> string_of_expr expr
 
 let rec apply_arithm env f label params =
   let (env, params) = update_apply_params env params in
@@ -50,7 +51,7 @@ and apply_cond env f label params =
 
 and apply_print env params =
   let (env, params) = update_apply_params env params in
-  List.iter (fun expr -> print_endline (string_of_expr expr)) params;
+  List.iter (fun expr -> print_endline **> string_of_expr expr) params;
   let last_param = List.nth params ((List.length params) - 1) in
   (env, last_param)
 
@@ -66,7 +67,7 @@ and update_apply_params env orig_params =
 and load_params_onto_env env args params =
   ignore (
     List.fold_left
-      (fun i arg -> Env.put env arg (List.nth params i); i + 1)
+      (fun i arg -> Env.put env arg **> List.nth params i; i + 1)
       0 args
   )
 
@@ -75,7 +76,7 @@ and eval_expr env expr =
   debug_print env expr;
   *)
   match expr with
-  | Var x -> eval_expr env (Env.get env x)
+  | Var x -> eval_expr env **> Env.get env x
 
   | Func (name, _, _) as x -> begin
       Env.put env name x; (env, x)
