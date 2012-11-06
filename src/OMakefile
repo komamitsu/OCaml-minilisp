@@ -1,6 +1,7 @@
 .PHONY: all clean
 
 FILES[] =
+	util
 	expr
 	parser
 	env

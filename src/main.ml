@@ -1,3 +1,4 @@
+open Util
 open BatPervasives
 
 let () =
@@ -26,7 +27,7 @@ let () =
           begin
             match last_expr with
             | None -> ()
-            | Some expr -> print_endline **> Expr.string_of_expr expr
+            | Some expr -> print_endline $ Expr.string_of_expr expr
           end;
           env
         end

@@ -1,4 +1,4 @@
-open BatPervasives
+open Util
 open Printf
 open Expr
 
@@ -7,9 +7,9 @@ let debug_print env expr =
   printf "  env ----------------------------\n";
   Env.iter env
     (fun k v ->
-  printf "    [%s] => %s \n" k **> string_of_expr v);
+  printf "    [%s] => %s \n" k $ string_of_expr v);
   printf "  expr ---------------------------\n";
-  printf "    %s \n" **> string_of_expr expr
+  printf "    %s \n" $ string_of_expr expr
 
 let rec apply_arithm env f label params =
   let (env, params) = update_apply_params env params in
@@ -17,16 +17,16 @@ let rec apply_arithm env f label params =
     | [] -> begin
         match result with
         | Some (Num a) -> Num a
-        | Some _ -> "'" ^ label ^ "' accepts only numbers" |> failwith 
-        | None -> "'" ^ label ^ "' needs arguments" |> failwith 
+        | Some _ -> failwith $ "'" ^ label ^ "' accepts only numbers"
+        | None -> failwith $ "'" ^ label ^ "' needs arguments"
     end
     | Num(x)::rest -> begin
       match result with
       | Some (Num a) -> loop (Some (Num (f a x))) rest
-      | Some _ -> "'" ^ label ^ "' accepts only numbers" |> failwith 
+      | Some _ -> failwith $ "'" ^ label ^ "' accepts only numbers"
       | None -> loop (Some (Num x)) rest
     end
-    | _ -> "'" ^ label ^ "' accepts only numbers" |> failwith
+    | _ -> failwith $ "'" ^ label ^ "' accepts only numbers"
   in
   (env, loop None params)
 
@@ -41,18 +41,18 @@ and apply_cond env f label params =
           | Some last_expr -> begin
             match last_expr with
             | Num y -> (result && f y x, Some expr)
-            | _ -> "'" ^ label ^ "' accepts only numbers#0" |> failwith 
+            | _ -> failwith $ "'" ^ label ^ "' accepts only numbers#0"
           end
         end
-        | _ -> "'" ^ label ^ "' accepts only numbers#1" |> failwith
+        | _ -> failwith $ "'" ^ label ^ "' accepts only numbers#1"
       ) (true, None) params
   in
   (env, if result then True else False)
 
 and apply_print env params =
   let (env, params) = update_apply_params env params in
-  List.iter (fun expr -> print_endline **> string_of_expr expr) params;
-  let last_param = List.length params - 1 |> List.nth params in
+  List.iter (fun expr -> print_endline $ string_of_expr expr) params;
+  let last_param = List.nth params $ List.length params - 1 in
   (env, last_param)
 
 and update_apply_params env orig_params =
@@ -67,7 +67,7 @@ and update_apply_params env orig_params =
 and load_params_onto_env env args params =
   ignore (
     List.fold_left
-      (fun i arg -> Env.put env arg **> List.nth params i; i + 1)
+      (fun i arg -> Env.put env arg $ List.nth params i; i + 1)
       0 args
   )
 
@@ -76,7 +76,7 @@ and eval_expr env expr =
   debug_print env expr;
   *)
   match expr with
-  | Var x -> eval_expr env **> Env.get env x
+  | Var x -> eval_expr env $ Env.get env x
 
   | Func (name, _, _) as x -> begin
       Env.put env name x; (env, x)
@@ -105,7 +105,7 @@ and eval_expr env expr =
         | ">=" -> apply_cond env (>=) ">=" params
         | "<=" -> apply_cond env (<=) "<=" params
         | "print" -> apply_print env params
-        | _ -> name ^ " isn't defined" |> failwith
+        | _ -> failwith $ name ^ " isn't defined"
       end
     end
 
